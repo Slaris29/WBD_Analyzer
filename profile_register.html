@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WBD 프로필 등록기</title>
+<style>
+:root{
+  --bg:#0a0e1a; --card:#10182a; --card2:#1a2438; --border:#2a3550;
+  --text:#e2e6ee; --muted:#7a8499; --amber:#ffc857;
+  --accent:#39ff8a; --warn:#ff8800; --danger:#ff4560;
+  --pink:#ff6b8a; --blue:#88ccff; --purple:#aa88ff;
+  --mono:'SF Mono','Consolas',monospace;
+}
+*{box-sizing:border-box}
+body{
+  background:linear-gradient(135deg,#0a0e1a,#0a1828);
+  color:var(--text); font-family:-apple-system,'Pretendard',sans-serif;
+  margin:0; min-height:100vh; padding:20px;
+}
+.container{max-width:1200px;margin:0 auto}
+h1{
+  font-size:28px;font-weight:800;margin:0 0 6px;
+  background:linear-gradient(90deg,#39ff8a,#88ccff,#aa88ff);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+}
+.sub{color:var(--muted);font-size:13px;margin-bottom:24px}
+
+.card{
+  background:var(--card);border:1px solid var(--border);
+  border-radius:8px;padding:18px;margin-bottom:16px;
+}
+.card-title{font-size:15px;font-weight:700;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+
+/* 입력 영역 */
+.drop-zone{
+  border:2px dashed var(--border);border-radius:8px;
+  padding:24px;text-align:center;cursor:pointer;
+  transition:all .2s; background:var(--card2);
+}
+.drop-zone:hover, .drop-zone.dragover{
+  border-color:var(--accent);background:rgba(57,255,138,0.05);
+}
+.drop-zone .icon{font-size:32px;margin-bottom:8px}
+.drop-zone .hint{color:var(--muted);font-size:11px;margin-top:6px}
+.drop-zone.has-data{border-color:var(--accent);background:rgba(57,255,138,0.05)}
+
+/* 진행 상황 */
+.progress{
+  display:grid;grid-template-columns:repeat(4,1fr);gap:10px;
+}
+.stat-box{
+  background:var(--card2);border:1px solid var(--border);
+  border-radius:6px;padding:12px;text-align:center;
+}
+.stat-num{font-size:24px;font-weight:800;font-family:var(--mono)}
+.stat-label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-top:4px}
+
+/* 검색 + 필터 */
+.toolbar{
+  display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px;
+}
+.search-input{
+  background:var(--card2);border:1px solid var(--border);color:var(--text);
+  padding:8px 12px;border-radius:6px;font-size:13px;flex:1;min-width:200px;
+  font-family:inherit;
+}
+.search-input:focus{outline:none;border-color:var(--accent)}
+.btn{
+  background:var(--card2);border:1px solid var(--border);color:var(--text);
+  padding:8px 14px;border-radius:6px;font-size:12px;cursor:pointer;
+  transition:all .15s;font-family:inherit;
+}
+.btn:hover{background:#222e4a;border-color:var(--accent)}
+.btn.active{background:var(--accent);color:#000;border-color:var(--accent);font-weight:700}
+.btn.primary{background:linear-gradient(90deg,#39ff8a,#88ccff);color:#000;font-weight:700;border:none}
+.btn.primary:hover{filter:brightness(1.1)}
+.btn.warn{color:var(--warn);border-color:var(--warn)}
+.btn.danger{color:var(--danger);border-color:var(--danger)}
+
+/* 매핑 테이블 */
+.mapping-list{
+  display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:10px;
+}
+.player-row{
+  background:var(--card2);border:1px solid var(--border);border-radius:6px;
+  padding:10px;display:flex;gap:10px;align-items:center;transition:all .15s;
+}
+.player-row.mapped{border-color:var(--accent)}
+.player-row.unmapped{border-color:var(--warn);opacity:0.85}
+.avatar{
+  width:44px;height:44px;border-radius:50%;border:2px solid var(--border);
+  display:flex;align-items:center;justify-content:center;font-weight:700;font-size:16px;
+  flex-shrink:0;overflow:hidden;background:var(--card);
+}
+.avatar img{width:100%;height:100%;object-fit:cover}
+.avatar.initial{font-family:var(--mono);color:#fff}
+.player-info{flex:1;min-width:0}
+.player-name{font-weight:700;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.player-status{font-size:10px;margin-top:2px;color:var(--muted);font-family:var(--mono)}
+.status-ok{color:var(--accent)}
+.status-warn{color:var(--warn)}
+.player-controls{display:flex;flex-direction:column;gap:4px;align-items:flex-end}
+.path-input{
+  background:var(--card);border:1px solid var(--border);color:var(--text);
+  padding:5px 8px;border-radius:4px;font-size:11px;width:140px;font-family:var(--mono);
+}
+.path-input:focus{outline:none;border-color:var(--accent)}
+.mini-btn{
+  background:transparent;border:1px solid var(--border);color:var(--muted);
+  padding:3px 8px;border-radius:3px;font-size:10px;cursor:pointer;
+}
+.mini-btn:hover{border-color:var(--accent);color:var(--text)}
+.mini-btn.danger:hover{border-color:var(--danger);color:var(--danger)}
+
+/* 출력 미리보기 */
+.preview-code{
+  background:#000;border:1px solid var(--border);border-radius:6px;
+  padding:14px;font-family:var(--mono);font-size:11px;color:#88ff88;
+  max-height:200px;overflow:auto;white-space:pre;
+}
+
+.empty{text-align:center;color:var(--muted);padding:30px;font-size:13px}
+
+/* 매핑 카운트 색상 */
+.match-fuzzy{color:var(--purple)}
+.match-exact{color:var(--accent)}
+.match-none{color:var(--warn)}
+
+/* 안내 */
+.info-box{
+  background:rgba(255,200,87,0.05);border:1px solid #5a4a20;border-radius:6px;
+  padding:12px;font-size:12px;color:#d4b87a;line-height:1.6;margin-bottom:14px;
+}
+.info-box code{background:#000;padding:1px 5px;border-radius:3px;color:#88ff88;font-family:var(--mono);font-size:11px}
+.info-box b{color:var(--amber)}
+
+#fileInput,#photoInput,#mapInput{display:none}
+
+/* 스크롤바 */
+::-webkit-scrollbar{width:8px;height:8px}
+::-webkit-scrollbar-track{background:var(--card)}
+::-webkit-scrollbar-thumb{background:#3a4560;border-radius:4px}
+::-webkit-scrollbar-thumb:hover{background:#4a5570}
+
+@media(max-width:600px){
+  .progress{grid-template-columns:repeat(2,1fr)}
+  .mapping-list{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>🃏 WBD 프로필 등록기</h1>
+  <div class="sub">게임 로그에서 선수 추출 → 사진 매핑 → <code style="background:#000;padding:1px 5px;border-radius:3px;color:#88ff88;font-family:var(--mono)">profile_map.js</code> 내보내기</div>
+
+  <!-- 사용 안내 -->
+  <div class="info-box">
+    <b>📖 사용 방법</b><br>
+    <b>1.</b> 게임 로그 .txt 파일 드래그 (또는 선택) → 모든 선수 자동 추출<br>
+    <b>2.</b> 사진 폴더 드래그 (또는 파일들 선택) → 선수명과 파일명 자동 매칭<br>
+    <b>3.</b> 미매핑 선수는 직접 파일명 입력 또는 파일 선택으로 매핑<br>
+    <b>4.</b> <code>💾 profile_map.js 내보내기</code> 클릭 → 분석기 폴더에 저장<br>
+    <b>5.</b> 분석기와 같은 폴더에 <code>profile/</code> 폴더 만들고 사진들 넣기
+  </div>
+
+  <!-- Step 1: 게임 로그 -->
+  <div class="card">
+    <div class="card-title">📂 1단계: 게임 로그 불러오기</div>
+    <div id="logDropZone" class="drop-zone" onclick="document.getElementById('fileInput').click()">
+      <div class="icon">📄</div>
+      <div><b>게임 로그 .txt 파일</b>을 드래그하거나 클릭해서 선택</div>
+      <div class="hint">여러 파일 동시 가능 · 모든 활성 시즌 추가하면 더 많은 선수 추출</div>
+    </div>
+    <input type="file" id="fileInput" accept=".txt,.csv" multiple onchange="handleLogFiles(this.files)">
+  </div>
+
+  <!-- Step 2: 사진 폴더 -->
+  <div class="card" id="photoCard" style="display:none">
+    <div class="card-title">🖼️ 2단계: 프로필 사진 불러오기</div>
+    <div id="photoDropZone" class="drop-zone" onclick="document.getElementById('photoInput').click()">
+      <div class="icon">📁</div>
+      <div><b>사진 파일들</b>을 드래그하거나 클릭해서 선택</div>
+      <div class="hint">폴더 통째로 드래그도 OK · 파일명이 선수명과 비슷하면 자동 매칭</div>
+    </div>
+    <input type="file" id="photoInput" accept="image/*" multiple onchange="handlePhotoFiles(this.files)">
+  </div>
+
+  <!-- 진행 상황 -->
+  <div class="card" id="progressCard" style="display:none">
+    <div class="card-title">📊 진행 상황</div>
+    <div class="progress">
+      <div class="stat-box">
+        <div class="stat-num" id="stat-total">0</div>
+        <div class="stat-label">총 선수</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-num match-exact" id="stat-mapped">0</div>
+        <div class="stat-label">매핑됨</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-num match-none" id="stat-unmapped">0</div>
+        <div class="stat-label">미매핑</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-num match-fuzzy" id="stat-photos">0</div>
+        <div class="stat-label">사진 파일</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 매핑 영역 -->
+  <div class="card" id="mappingCard" style="display:none">
+    <div class="card-title">
+      🎨 3단계: 선수별 매핑
+      <span style="margin-left:auto;font-size:11px;color:var(--muted);font-weight:400">파일명만 입력 (예: <code style="background:#000;padding:1px 4px;color:#88ff88">noonkkot.png</code>)</span>
+    </div>
+    <div class="toolbar">
+      <input type="text" id="searchInput" class="search-input" placeholder="🔍 선수명 검색..." oninput="renderMapping()">
+      <button class="btn" id="filter-all" onclick="setFilter('all')">전체</button>
+      <button class="btn" id="filter-mapped" onclick="setFilter('mapped')">✓ 매핑됨</button>
+      <button class="btn active" id="filter-unmapped" onclick="setFilter('unmapped')">⚠ 미매핑만</button>
+      <button class="btn warn" onclick="autoMatch()">🤖 자동 매칭 다시</button>
+      <button class="btn danger" onclick="clearAllMappings()">🗑 매핑 초기화</button>
+    </div>
+    <div id="mappingList" class="mapping-list"></div>
+  </div>
+
+  <!-- 출력 -->
+  <div class="card" id="exportCard" style="display:none">
+    <div class="card-title">💾 4단계: 내보내기</div>
+    <div class="toolbar">
+      <button class="btn primary" onclick="exportMap()">💾 profile_map.js 다운로드</button>
+      <button class="btn" onclick="copyToClipboard()">📋 클립보드 복사</button>
+      <button class="btn" onclick="document.getElementById('mapInput').click()">📥 기존 profile_map.js 불러오기</button>
+      <input type="file" id="mapInput" accept=".js" onchange="loadExistingMap(this.files)">
+    </div>
+    <div style="margin-top:12px;font-size:12px;color:var(--muted)">미리보기:</div>
+    <div id="preview" class="preview-code">// 데이터 없음</div>
+  </div>
+</div>
+
+<script>
+// ─── 상태 ───
+let players = new Set();   // 모든 선수 이름
+let photoFiles = {};       // 파일명 → File 객체
+let photoPreviews = {};    // 파일명 → base64 dataURL
+let mapping = {};          // 선수명 → 파일명
+let currentFilter = 'unmapped';
+
+// ─── 드래그 앤 드롭 ───
+function setupDropZone(zoneId, handler, accept){
+  const zone = document.getElementById(zoneId);
+  ['dragover','dragleave','drop'].forEach(ev=>{
+    zone.addEventListener(ev, e=>{ e.preventDefault(); e.stopPropagation(); });
+  });
+  zone.addEventListener('dragover', ()=>zone.classList.add('dragover'));
+  zone.addEventListener('dragleave', ()=>zone.classList.remove('dragover'));
+  zone.addEventListener('drop', e=>{
+    zone.classList.remove('dragover');
+    const items = e.dataTransfer.items;
+    if(items && items[0]?.webkitGetAsEntry){
+      // 폴더 지원
+      const files = [];
+      const promises = [];
+      for(let item of items){
+        const entry = item.webkitGetAsEntry();
+        if(entry) promises.push(traverseEntry(entry, files));
+      }
+      Promise.all(promises).then(()=>handler(files));
+    } else {
+      handler(e.dataTransfer.files);
+    }
+  });
+}
+
+// 폴더 재귀 순회
+function traverseEntry(entry, files){
+  return new Promise(resolve=>{
+    if(entry.isFile){
+      entry.file(f=>{ files.push(f); resolve(); });
+    } else if(entry.isDirectory){
+      const reader = entry.createReader();
+      reader.readEntries(entries=>{
+        Promise.all(entries.map(e=>traverseEntry(e,files))).then(resolve);
+      });
+    } else resolve();
+  });
+}
+
+setupDropZone('logDropZone', handleLogFiles);
+setupDropZone('photoDropZone', handlePhotoFiles);
+
+// CSV 셀 정리 (분석기와 동일한 로직)
+function stripQuotes(s){
+  if(!s) return '';
+  s = String(s).trim();
+  if((s.startsWith('"') && s.endsWith('"')) || (s.startsWith("'") && s.endsWith("'"))){
+    s = s.slice(1,-1).trim();
+  }
+  return s;
+}
+
+// ─── 게임 로그 처리 ───
+async function handleLogFiles(files){
+  if(!files || !files.length) return;
+  const validFiles = [...files].filter(f => /\.(txt|csv)$/i.test(f.name));
+  if(!validFiles.length){ alert('txt 또는 csv 파일이 없어요'); return; }
+  
+  let totalAdded = 0;
+  for(const file of validFiles){
+    const text = await file.text();
+    const lines = text.split('\n');
+    if(!lines.length) continue;
+    const header = lines[0].split(',').map(h => stripQuotes(h));
+    const pIdx = header.indexOf('pName');
+    const bIdx = header.indexOf('bName');
+    if(pIdx<0 && bIdx<0) continue;
+    
+    const before = players.size;
+    lines.slice(1).forEach(line=>{
+      const cols = line.split(',');
+      if(pIdx>=0 && cols[pIdx]){
+        const name = stripQuotes(cols[pIdx]);
+        if(name) players.add(name);
+      }
+      if(bIdx>=0 && cols[bIdx]){
+        const name = stripQuotes(cols[bIdx]);
+        if(name) players.add(name);
+      }
+    });
+    totalAdded += players.size - before;
+  }
+  
+  // 빈 이름/숫자/헤더 제거
+  [...players].forEach(p=>{ 
+    if(!p || p==='0' || p==='pName' || p==='bName' || /^["'\s]*$/.test(p)){
+      players.delete(p);
+    }
+  });
+  
+  document.getElementById('logDropZone').classList.add('has-data');
+  document.getElementById('logDropZone').innerHTML = `
+    <div class="icon">✓</div>
+    <div><b>${validFiles.length}개 파일 로드됨</b> · 총 <b style="color:var(--accent)">${players.size}명</b> 선수 추출</div>
+    <div class="hint">다른 파일 추가하려면 다시 드래그/클릭</div>
+  `;
+  
+  document.getElementById('photoCard').style.display = 'block';
+  document.getElementById('progressCard').style.display = 'block';
+  document.getElementById('mappingCard').style.display = 'block';
+  document.getElementById('exportCard').style.display = 'block';
+  
+  updateProgress();
+  renderMapping();
+}
+
+// ─── 사진 파일 처리 ───
+async function handlePhotoFiles(files){
+  if(!files || !files.length) return;
+  const imgFiles = [...files].filter(f => /\.(png|jpg|jpeg|webp|gif)$/i.test(f.name));
+  if(!imgFiles.length){ alert('이미지 파일이 없어요'); return; }
+  
+  for(const f of imgFiles){
+    const fname = f.name;  // 폴더 없이 파일명만
+    photoFiles[fname] = f;
+    // base64 미리보기 생성
+    photoPreviews[fname] = await new Promise(res=>{
+      const reader = new FileReader();
+      reader.onload = ()=>res(reader.result);
+      reader.readAsDataURL(f);
+    });
+  }
+  
+  document.getElementById('photoDropZone').classList.add('has-data');
+  document.getElementById('photoDropZone').innerHTML = `
+    <div class="icon">✓</div>
+    <div><b>${Object.keys(photoFiles).length}개 사진 로드됨</b></div>
+    <div class="hint">더 추가하려면 다시 드래그/클릭</div>
+  `;
+  
+  autoMatch();
+  updateProgress();
+  renderMapping();
+}
+
+// ─── 자동 매칭 (파일명 vs 선수명) ───
+function autoMatch(){
+  const photoNames = Object.keys(photoFiles);
+  const matched = [];
+  
+  players.forEach(player=>{
+    if(mapping[player]) return; // 이미 매핑된 건 그대로
+    
+    // 1. 정확 매칭 (확장자 포함)
+    let match = photoNames.find(p => p === player);
+    if(!match){
+      // 2. 확장자 제거 후 정확 매칭
+      const stripped = (n)=>n.replace(/\.[^.]+$/,'');
+      match = photoNames.find(p => stripped(p) === player);
+    }
+    if(!match){
+      // 3. 정규화 (소문자, 공백/특수문자 제거) 매칭
+      const norm = (s)=>s.toLowerCase().replace(/[\s\-_.]/g,'');
+      const np = norm(player);
+      match = photoNames.find(p => {
+        const pn = norm(p.replace(/\.[^.]+$/,''));
+        return pn === np;
+      });
+    }
+    if(!match){
+      // 4. 부분 매칭 (선수명이 파일명에 포함)
+      const norm = (s)=>s.toLowerCase().replace(/[\s\-_.]/g,'');
+      const np = norm(player);
+      if(np.length >= 3){
+        match = photoNames.find(p => norm(p.replace(/\.[^.]+$/,'')).includes(np));
+      }
+    }
+    
+    if(match){
+      mapping[player] = match;
+      matched.push({player, file:match});
+    }
+  });
+  
+  console.log(`자동 매칭: ${matched.length}명 매핑됨`);
+}
+
+// ─── 진행 상황 업데이트 ───
+function updateProgress(){
+  const total = players.size;
+  const mapped = Object.keys(mapping).filter(p=>players.has(p) && mapping[p]).length;
+  document.getElementById('stat-total').textContent = total;
+  document.getElementById('stat-mapped').textContent = mapped;
+  document.getElementById('stat-unmapped').textContent = total - mapped;
+  document.getElementById('stat-photos').textContent = Object.keys(photoFiles).length;
+  updatePreview();
+}
+
+// ─── 매핑 렌더 ───
+function setFilter(f){
+  currentFilter = f;
+  ['all','mapped','unmapped'].forEach(x=>{
+    document.getElementById('filter-'+x).classList.toggle('active', x===f);
+  });
+  renderMapping();
+}
+
+function renderMapping(){
+  const search = document.getElementById('searchInput')?.value.toLowerCase()||'';
+  const list = document.getElementById('mappingList');
+  
+  let entries = [...players].sort((a,b)=>a.localeCompare(b,'ko'));
+  if(search) entries = entries.filter(p => p.toLowerCase().includes(search));
+  if(currentFilter==='mapped') entries = entries.filter(p => mapping[p]);
+  else if(currentFilter==='unmapped') entries = entries.filter(p => !mapping[p]);
+  
+  if(!entries.length){
+    list.innerHTML = '<div class="empty">조건에 맞는 선수가 없어요</div>';
+    return;
+  }
+  
+  list.innerHTML = entries.map(player=>{
+    const file = mapping[player];
+    const preview = file && photoPreviews[file];
+    const exists = file && photoFiles[file]; // 우리가 로드한 사진에 있는지
+    
+    let avatar;
+    if(preview){
+      avatar = `<div class="avatar"><img src="${preview}" alt=""></div>`;
+    } else {
+      // 이니셜 아바타
+      const hash = [...player].reduce((s,c)=>s+c.charCodeAt(0),0);
+      const hue = hash % 360;
+      avatar = `<div class="avatar initial" style="background:hsl(${hue},50%,40%);border-color:hsl(${hue},50%,50%)">${(player[0]||'?').toUpperCase()}</div>`;
+    }
+    
+    let status, statusClass;
+    if(file && exists){ status = '✓ 매핑됨 (사진 확인)'; statusClass = 'status-ok'; }
+    else if(file && !exists){ status = `⚠ ${file} (수동 입력, 미확인)`; statusClass = 'status-warn'; }
+    else { status = '미매핑'; statusClass = 'status-warn'; }
+    
+    const safeName = player.replace(/'/g,"\\'").replace(/"/g,'&quot;');
+    
+    return `<div class="player-row ${file?'mapped':'unmapped'}">
+      ${avatar}
+      <div class="player-info">
+        <div class="player-name">${player}</div>
+        <div class="player-status ${statusClass}">${status}</div>
+      </div>
+      <div class="player-controls">
+        <input type="text" class="path-input" placeholder="파일명.png" value="${file||''}" 
+               onchange="setMapping('${safeName}', this.value)">
+        <div style="display:flex;gap:4px">
+          <button class="mini-btn" onclick="quickPickFile('${safeName}')">📁 선택</button>
+          ${file?`<button class="mini-btn danger" onclick="removeMapping('${safeName}')">✕</button>`:''}
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ─── 매핑 작업 ───
+function setMapping(player, value){
+  if(!value || !value.trim()) delete mapping[player];
+  else mapping[player] = value.trim();
+  updateProgress();
+  renderMapping();
+}
+
+function removeMapping(player){
+  delete mapping[player];
+  updateProgress();
+  renderMapping();
+}
+
+function clearAllMappings(){
+  if(!confirm('모든 매핑을 초기화할까요?')) return;
+  mapping = {};
+  updateProgress();
+  renderMapping();
+}
+
+// 빠른 파일 선택 (개별 선수)
+function quickPickFile(player){
+  const inp = document.createElement('input');
+  inp.type = 'file';
+  inp.accept = 'image/*';
+  inp.onchange = async ()=>{
+    const f = inp.files[0];
+    if(!f) return;
+    photoFiles[f.name] = f;
+    photoPreviews[f.name] = await new Promise(res=>{
+      const r = new FileReader();
+      r.onload = ()=>res(r.result);
+      r.readAsDataURL(f);
+    });
+    mapping[player] = f.name;
+    updateProgress();
+    renderMapping();
+  };
+  inp.click();
+}
+
+// ─── 출력 ───
+function generateMapJS(){
+  const filtered = {};
+  Object.keys(mapping).sort((a,b)=>a.localeCompare(b,'ko')).forEach(p=>{
+    if(mapping[p] && players.has(p)) filtered[p] = mapping[p];
+  });
+  
+  const date = new Date().toISOString().split('T')[0];
+  const count = Object.keys(filtered).length;
+  
+  let js = `// WBD 분석기 프로필 매핑\n`;
+  js += `// 생성일: ${date}\n`;
+  js += `// 매핑된 선수: ${count}명\n`;
+  js += `// 사용법: 분석기와 같은 폴더에 이 파일을 두고, profile/ 폴더 만들어 사진 넣기\n\n`;
+  js += `window.PROFILE_MAP = {\n`;
+  Object.entries(filtered).forEach(([p,f],i,arr)=>{
+    const pe = JSON.stringify(p);
+    const fe = JSON.stringify(f);
+    js += `  ${pe}: ${fe}${i<arr.length-1?',':''}\n`;
+  });
+  js += `};\n`;
+  return js;
+}
+
+function updatePreview(){
+  const js = generateMapJS();
+  // 너무 길면 일부만
+  const lines = js.split('\n');
+  const display = lines.length > 30 ? lines.slice(0,15).concat(['  ...', `  // (${lines.length-15}줄 생략)`, '};']).join('\n') : js;
+  document.getElementById('preview').textContent = display || '// 매핑 없음';
+}
+
+function exportMap(){
+  const js = generateMapJS();
+  const blob = new Blob([js], {type:'application/javascript'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'profile_map.js';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function copyToClipboard(){
+  const js = generateMapJS();
+  navigator.clipboard.writeText(js).then(()=>{
+    alert('클립보드에 복사됨!');
+  }).catch(()=>{
+    // fallback
+    const ta = document.createElement('textarea');
+    ta.value = js;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    alert('클립보드에 복사됨!');
+  });
+}
+
+async function loadExistingMap(files){
+  if(!files || !files[0]) return;
+  const text = await files[0].text();
+  // window.PROFILE_MAP = { ... } 추출
+  const match = text.match(/window\.PROFILE_MAP\s*=\s*(\{[\s\S]*?\});/);
+  if(!match){ alert('PROFILE_MAP을 찾을 수 없어요'); return; }
+  try {
+    const obj = (new Function('return '+match[1]))();
+    
+    // 따옴표 포함된 키 자동 정리
+    let cleaned = 0;
+    Object.entries(obj).forEach(([k,v])=>{
+      const cleanKey = stripQuotes(k);
+      if(cleanKey !== k){
+        mapping[cleanKey] = v;
+        cleaned++;
+      } else {
+        mapping[k] = v;
+      }
+    });
+    
+    // 선수 목록에 없는 이름도 추가 (이미 매핑된 거)
+    Object.keys(mapping).forEach(p=>players.add(p));
+    
+    updateProgress();
+    renderMapping();
+    if(cleaned > 0){
+      alert(`${Object.keys(obj).length}개 매핑 불러옴\n⚠ 이전 버전 등록기로 만든 키 ${cleaned}개를 자동 정리했습니다 (따옴표 제거).\n\n다시 내보내기 권장!`);
+    } else {
+      alert(`${Object.keys(obj).length}개 매핑 불러옴`);
+    }
+  } catch(e){
+    alert('파일 형식이 올바르지 않아요: '+e.message);
+  }
+}
+</script>
+</body>
+</html>
