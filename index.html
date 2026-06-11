@@ -10016,35 +10016,12 @@ function calcPitcherWAR(name){
   return c[k];
 }
 function _calcPitcherWARImpl(name){
-  const pd=G.filter(d=>String(d.pName)===String(name));
-  if(pd.length<15)return 0;
-  const _ps=_getPitcherSeason(name);
-  const ip=_ps.ip;
-  if(ip<1)return 0;
-  const era=_ps.era;
-  
-  const battedPd=pd.filter(d=>d.ev>0);
-  const hrs=battedPd.filter(d=>d.result===4).length;
-  const ks=pd.filter(d=>_isK(d)).length;
-  const bb=pd.filter(d=>d.result===5||d.result===6).length;
-  const baAgainst=battedPd.length?battedPd.filter(d=>d['1BSafe']||d.result===4).length/battedPd.length:0.35;
-  const kPct=ks/pd.length*100;
-  const bbPct=bb/pd.length*100;
-  
-  // 환경 평균 동적 계산 (시즌별로 자동 갱신)
-  const lg=_getLeagueAverages();
-  
-  // 핵심 컴포넌트들 (환경 대비 차이 × IP)
-  const eraDelta=(lg.ERA-era)*ip*0.05;
-  const baDelta=(lg.BAagainst-baAgainst)*ip*0.25;     // 0.3 → 0.25 (살짝 ↓)
-  const kDelta=(kPct-lg.KPct)*ip*0.010;               // 0.012 → 0.010 (살짝 ↓)
-  const bbDelta=(lg.BBPct-bbPct)*ip*0.025;            // 0.03 → 0.025
-  const hrDelta=-hrs*0.20;                             // 0.25 → 0.20
-  const ipBonus=Math.min(ip,30)*0.10;                 // 0.08 → 0.10 (등판 보너스 ↑)
-  
-  let war=eraDelta+baDelta+kDelta+bbDelta+hrDelta+ipBonus;
-  war=Math.max(war, -1.0);                             // 음수 cap -1.5 → -1.0
-  return Math.round(war*10)/10;
+  // V10.1: 기록실 pWAR로 통합 — FIP(WBD 리그 RA9 보정) 기반
+  try {
+    const r = _computeRecordsData().pitchers.find(p => p.name === String(name));
+    if(r && r.pwar != null && r.n >= 15) return +r.pwar.toFixed(2);
+  } catch(e){}
+  return 0;
 }
 
 function calcBatterWAR(name){
@@ -10055,32 +10032,12 @@ function calcBatterWAR(name){
   return c[k];
 }
 function _calcBatterWARImpl(name){
-  const all=G.filter(d=>String(d.bName)===String(name));
-  const bd=all.filter(d=>d.ev>0);
-  if(bd.length<5)return 0;
-  
-  const hits=bd.filter(d=>d['1BSafe']||d.result===4).length;
-  const hrs=bd.filter(d=>d.result===4).length;
-  const singles=bd.filter(d=>d['1BSafe']&&d.result!==4).length;
-  const bb=all.filter(d=>d.result===5).length;
-  const hbp=all.filter(d=>d.result===6).length;
-  const PA=_countPaEnd(all).length || (bd.length+bb+hbp);
-  if(PA<5)return 0;
-  
-  // wOBA (1B/HR/BB/HBP만)
-  const wOBA=(0.7*bb + 0.7*hbp + 0.9*singles + 2.0*hrs) / PA;
-  
-  // 환경 평균 동적 계산
-  const lg=_getLeagueAverages();
-  const wRAA=(wOBA - lg.wOBA) * PA;
-  
-  const battingWAR=wRAA/5;
-  const hrBonus=hrs*0.12;
-  const paBonus=Math.min(PA,200)*0.005;
-  
-  let war=battingWAR + hrBonus + paBonus;
-  war=Math.max(war, -3);
-  return Math.round(war*10)/10;
+  // V10.1: 기록실 oWAR로 통합 — 안타 분류(2/3루타) + WBD 환경 보정 wOBA/wRAA/RPW 기반
+  try {
+    const r = _computeRecordsData().batters.find(b => b.name === String(name));
+    if(r && r.PA >= 5) return +r.owar.toFixed(2);
+  } catch(e){}
+  return 0;
 }
 
 // ─── 어워드 페이지 ───
@@ -10733,7 +10690,7 @@ const CHANGELOG = [
       {icon:'🛡️', text:'⭐⭐⭐ <b>수비 OAA v4 — 요구속도 연속 커브 모델</b> — Statcast catch probability 방식으로 전면 재설계. 기존 v3의 수백 개 빈 + 4단계 폴백을 <b>그룹별 커브 3개</b>로 교체: 외야 플라이는 요구속도 v=이동거리/가용시간(hSec→cSec) 단일 변수 (리그전 63게임 실측: v 0→5에서 아웃률 83%→25% 단조 감소 검증), 외야 라이너(la&lt;10°)와 내야는 거리 커브. <b>zero-sum 캘리브레이션</b>으로 리그 전체 OAA 합=0 보장. 데이터 늘수록 커브가 자동 정교화 — 수동 재보정 불필요'},
       {icon:'📚', text:'⭐⭐⭐ <b>(NEW) 기록실 페이지</b> — 스탯티즈 스타일 풀 기록 테이블. 타자 28컬럼(1/2/3루타·루타·wOBA·wRC+·wRAA·oWAR·BABIP·K%·BB% 등) / 투수 23컬럼(FIP·FIP-·WHIP·K/BB·pWAR·피OPS 등). 모든 컬럼 헤더 클릭 정렬, 팀·최소표본·이름 필터, 선수명 클릭 시 카드 상세'},
       {icon:'⚾', text:'⭐⭐⭐ <b>(NEW) 안타 1/2/3루타 분류 — 베이스 추적 방식</b> — 안타 직후 다음 타석의 베이스 선수ID에서 "새로 등장한 ID = 방금 친 타자"로 도달 베이스 확정 (확정률 ~84%, 나머지는 타구거리 90m 임계 추정). <b>SLG가 진짜 장타율로 전면 교체</b> (기존 5곳의 1루타+HR 근사식 폐기). 타자 헤더에 1·2·3루타/OPS/ISO/BABIP 표시 추가'},
-      {icon:'📐', text:'⭐⭐⭐ <b>(NEW) 세이버메트릭스 — wOBA / wRC+ / FIP / WAR</b> — 전부 <b>WBD 리그 자체 환경 보정</b> (MLB 상수 미사용): 리그 총 득점·타석·이닝을 실데이터에서 산출. wRC+/FIP- 리그평균=100. WAR은 수비 OAA 신뢰도 미달로 <b>oWAR(타격)/pWAR(FIP)</b> 분리 제공. wRAA·WHIP·K/BB도 추가. 내보내기 schema v8 (<code>season.advanced</code> 블록)'},
+      {icon:'📐', text:'⭐⭐⭐ <b>(NEW) 세이버메트릭스 — wOBA / wRC+ / FIP / WAR</b> — 전부 <b>WBD 리그 자체 환경 보정</b> (MLB 상수 미사용): 리그 총 득점·타석·이닝을 실데이터에서 산출. wRC+/FIP- 리그평균=100. 전역 WAR 기준 = 타자 <b>oWAR</b> / 투수 <b>pWAR</b>. dWAR·종합WAR은 기록실에 [참고]로 병기 (OAA v4 검증 완료 시 메인 승격). <b>WAR144</b>(KBO 144경기 환산, 순위 불변·스케일만 KBO 감각) 추가. <b>기존 calcWAR 전면 교체</b>로 리더보드·헤더·카드 WAR 모두 새 식 통일. 투수 <b>ERA</b>(실점=자책)·야구식 이닝(38.2) 기록실 추가. wRAA·WHIP·K/BB도 추가. 내보내기 schema v8 (<code>season.advanced</code> 블록)'},
       {icon:'🎯', text:'⭐⭐ <b>투수 리포트 코스명 우타 기준 통일</b> — 코스 분포("높은 바깥쪽")와 약점 존 모두 우타 기준 + "(우타 기준)" 명시. 좌타+우타 합산 통계의 모호함 해소. 절대좌표(좌상/우하) 표기 전면 제거'},
       {icon:'👤', text:'⭐⭐⭐ <b>(NEW) WBD 공식 프로필 사진 자동 연동</b> — <code>https://images.vrcbaseball.com/pfp/{인덱스}.png</code> URL로 선수 프로필 자동 표시. <b>기본 매핑 370명 내장</b>(JP/KR/EN 리전 전체). 우선순위: 로컬 PROFILE_MAP &gt; 사용자 커스텀(localStorage) &gt; 기본 매핑 &gt; 실루엣. 이미지 로드 실패시 자동 폴백'},
       {icon:'👤', text:'⭐⭐⭐ <b>(NEW) 프로필 사진 관리 페이지</b> — 메뉴 추가. 5개 통계 카드(전체/사진있음/내가추가/게임출전+사진/게임출전+사진없음), 검색 + 5종 필터(전체/게임출전/사진없음/내가추가/기본), 인덱스 추가/수정/삭제 + 저장 전 미리보기. 커스텀 매핑 JSON 백업/복원 지원'},
@@ -21095,14 +21052,41 @@ function _computeRecordsData(){
   const lgRPG = activeGames>0 ? lgR/(activeGames*2) : 0;  // 팀당 경기당 득점
   const RPW = 1.5*lgRPG + 3;
   // 타자 oWAR = (wRAA + 대체수준 보정 20런/600PA) / RPW
+  // V10.1: dWAR — OAA v4(요구속도 모델 + zero-sum 보정) 신뢰도 확보로 WAR에 합류
+  const defOaa = {};
+  try {
+    const dd = _computeDefenseData();
+    dd.enriched.forEach(p => {
+      if(!p._cplr || !p._pos) return;
+      defOaa[p._cplr] = (defOaa[p._cplr]||0) + ((p._isOut?1:0) - p._xOut);
+    });
+  } catch(e){}
+  // OAA 1개의 런 가치: MLB ~0.8런을 WBD 득점환경으로 스케일 (타고 리그 = 아웃 가치 ↑)
+  const runsPerOAA = 0.8 * (lgRPG>0 ? lgRPG/4.5 : 1);
+  // 시즌 길이 (풀타임 선수 출장수 근사) — WAR144 환산용
+  const seasonLen = Math.max(1, ...batters.map(b=>b.G), ...pitchers.map(p=>p.G));
+  const _war144Scale = 144 / seasonLen;  // KBO 144경기 환산 계수 (전 선수 동일 → 순위 불변)
   batters.forEach(b => {
     b.wraa = (b.PA>0 && wobaScale>0) ? (b.woba-lgWoba)/wobaScale*b.PA : 0;
-    b.owar = RPW>0 ? (b.wraa + 20*b.PA/600)/RPW : 0;
+    b.owar = RPW>0 ? (b.wraa + 20*b.PA/600)/RPW : 0;  // ★ 전역 WAR 기준 (리더보드·헤더·카드)
+    b.war144 = b.owar * _war144Scale;  // KBO 시즌 길이 환산 oWAR
+    // 참고용: 수비 OAA → dWAR → 종합 WAR (OAA v4 검증 기간이라 메인 지표는 oWAR)
+    b.dOaa = defOaa[b.name] != null ? defOaa[b.name] : null;
+    b.dWar = (b.dOaa!=null && RPW>0) ? b.dOaa*runsPerOAA/RPW : null;
+    b.war = b.owar + (b.dWar||0);
   });
   // 투수 pWAR = (대체수준 RA9 - FIP)/9 × IP / RPW. 대체수준 = 리그평균×1.15
   const replRA9 = lgRA9*1.15;
   pitchers.forEach(p => {
     p.pwar = (p.fip!=null && RPW>0) ? ((replRA9-p.fip)/9*p.IP)/RPW : null;
+    p.war144 = p.pwar!=null ? p.pwar * _war144Scale : null;
+    // ERA (실점=자책 단순화) + 야구식 이닝 표기 — 기존 _getPitcherSeason 활용
+    try {
+      const _s = _getPitcherSeason(p.name);
+      p.era = _s && _s.ip>0 ? _s.era : null;
+      p.ipDisp = _s ? _s.ipDisp : null;
+      p.runs = _s ? _s.runs : null;
+    } catch(e){ p.era=null; p.ipDisp=null; p.runs=null; }
   });
   
   window._recordsCache = {key: cacheKey, batters, pitchers, lg:{lgR, lgRPA, lgWoba, wobaScale, lgRA9, cFIP, RPW, lgRPG}};
@@ -21170,7 +21154,11 @@ function renderRecordsPage(){
     {k:'woba', l:'wOBA', fmt:f3, hl:'#ffd700', t:'가중 출루율 — 안타 종류별 득점 기여 가중 (1B 0.88 / 2B 1.25 / 3B 1.59 / HR 2.05), WBD 리그 OBP 스케일'},
     {k:'wrcPlus', l:'wRC+', fmt:v=>v.toFixed(0), hl:'#ffc844', t:'조정 득점 창출력 — 리그 평균 100. 130 = 평균보다 30% 많은 득점 생산'},
     {k:'wraa', l:'wRAA', fmt:v=>(v>=0?'+':'')+v.toFixed(1), hl:'#88ddaa', t:'평균 대비 득점 기여 (런 단위). +10 = 평균 타자보다 10점 더 생산'},
-    {k:'owar', l:'oWAR', fmt:v=>(v>=0?'+':'')+v.toFixed(2), hl:'#ff6688', t:'공격 WAR (수비 제외) — 대체 선수 대비 승수 기여. 수비 OAA는 표본 부족으로 미포함'},
+    {k:'owar', l:'oWAR', fmt:v=>(v>=0?'+':'')+v.toFixed(2), hl:'#ff6688', t:'공격 WAR — 타격만. 수비는 OAA 신뢰도 검증 후 합류 예정 (수비 페이지 참고)'},
+    {k:'war144', l:'WAR144', fmt:v=>(v>=0?'+':'')+v.toFixed(1), hl:'#ff4488', t:'KBO 시즌(144경기) 길이 환산 oWAR — 전 선수 동일 계수라 순위 불변, 스케일만 KBO 감각 (8+ = MVP급)'},
+    {k:'dOaa', l:'OAA', fmt:v=>v==null?'-':(v>=0?'+':'')+v.toFixed(1), hl:'#557788', t:'[참고] 수비 OAA v4 전 포지션 합산 — 검증 기간 지표'},
+    {k:'dWar', l:'dWAR', fmt:v=>v==null?'-':(v>=0?'+':'')+v.toFixed(2), hl:'#557788', t:'[참고] 수비 WAR (OAA 런환산) — 검증 기간 지표'},
+    {k:'war', l:'WAR(참고)', fmt:v=>(v>=0?'+':'')+v.toFixed(2), hl:'#778899', t:'[참고] oWAR + dWAR 종합 — 수비 검증 완료 시 메인 승격 예정'},
     {k:'iso', l:'ISO', fmt:f3, hl:'#ffaa66'},
     {k:'babip', l:'BABIP', fmt:f3, hl:'#66ccdd'},
     {k:'kPct', l:'K%', fmt:f1},
@@ -21182,7 +21170,8 @@ function renderRecordsPage(){
     {k:'team', l:'팀', fmt:v=>v, w:'90px'},
     {k:'G', l:'G', fmt:v=>v},
     {k:'n', l:'투구수', fmt:v=>v},
-    {k:'IP', l:'이닝', fmt:v=>v.toFixed(1), t:'추정 이닝 (아웃수/3)'},
+    {k:'IP', l:'이닝', fmt:function(v){ const o=Math.round(v*3); return Math.floor(o/3)+'.'+(o%3); }, t:'야구식 표기 (38.2 = 38과 2/3이닝)'},
+    {k:'era', l:'ERA', fmt:v=>v==null?'-':v.toFixed(2), hl:'#ff8866', t:'평균자책점 (실점=자책 단순화 — WBD엔 자책 구분 데이터 없음)'},
     {k:'BF', l:'타자', fmt:v=>v, t:'상대 타자 수'},
     {k:'H', l:'피안타', fmt:v=>v},
     {k:'HR', l:'피홈런', fmt:v=>v},
@@ -21198,6 +21187,7 @@ function renderRecordsPage(){
     {k:'whip', l:'WHIP', fmt:v=>v==null?'-':v.toFixed(2), hl:'#88ddaa', t:'이닝당 출루 허용 (볼넷+피안타)/이닝. 낮을수록 좋음'},
     {k:'kbb', l:'K/BB', fmt:v=>v==null?'-':(v>=99?'∞':v.toFixed(1)), hl:'#66ccdd', t:'삼진/볼넷 비율. 높을수록 좋음'},
     {k:'pwar', l:'pWAR', fmt:v=>v==null?'-':(v>=0?'+':'')+v.toFixed(2), hl:'#ff6688', t:'투구 WAR (FIP 기반) — 대체 선수 대비 승수 기여'},
+    {k:'war144', l:'WAR144', fmt:v=>v==null?'-':(v>=0?'+':'')+v.toFixed(1), hl:'#ff4488', t:'KBO 시즌(144경기) 길이 환산 pWAR — 순위 불변, 스케일만 KBO 감각'},
     {k:'kPct', l:'K%', fmt:f1},
     {k:'bbPct', l:'BB%', fmt:f1},
     {k:'whiffPct', l:'헛스윙%', fmt:f1, hl:'#ff4560'},
@@ -23448,7 +23438,8 @@ function exportAnalyticsBundle(opts){
         '📊 (NEW) pitchers[i].season.advanced: {FIP, FIPminus, WHIP, KBB, pWAR, estIP} — WBD 리그 RA9 보정',
         '📊 wOBA/wRC+/FIP 모두 WBD 리그 자체 환경 상수 사용 (리그 평균 = 100 기준)',
         '⚠️ 기존 season.wOBA(v7)는 안타 분류 이전 근사치 — advanced.wOBA가 정확한 값',
-        '⚠️ WAR은 수비(OAA) 제외 버전: 타자 oWAR(타격만) / 투수 pWAR(FIP 기반)'
+        '📊 타자 oWAR(타격만, 수비는 OAA 신뢰도 검증 후 합류 예정) / 투수 pWAR(FIP 기반) / WAR144(KBO 144경기 환산) / 투수 ERA(실점=자책). dOAA_ref는 참고용',
+        '⚙️ calcBatterWAR/calcPitcherWAR 전면 통합 — 리더보드·헤더·카드의 WAR이 모두 새 식 사용'
       ],
       v7_changes:[
         '📊 (NEW) batters[i].season.battedBall: 타구 프로파일 추가 — {n, avgLA, gbPct, ldPct, fbPct, gb, ld, fb, thresholds}',
@@ -23541,7 +23532,8 @@ function exportAnalyticsBundle(opts){
           const _r=_computeRecordsData().pitchers.find(p=>p.name===n);
           return _r?{FIP:_r.fip!=null?+_r.fip.toFixed(2):null,FIPminus:_r.fipMinus!=null?+_r.fipMinus.toFixed(0):null,
             WHIP:_r.whip!=null?+_r.whip.toFixed(2):null,KBB:_r.kbb!=null?+Math.min(_r.kbb,99).toFixed(1):null,
-            pWAR:_r.pwar!=null?+_r.pwar.toFixed(2):null,estIP:+_r.IP.toFixed(1)}:null;
+            pWAR:_r.pwar!=null?+_r.pwar.toFixed(2):null,WAR144:_r.war144!=null?+_r.war144.toFixed(1):null,
+            ERA:_r.era!=null?+_r.era.toFixed(2):null,estIP:+_r.IP.toFixed(1)}:null;
         }catch(_){return null}})(),
         WHIP:+(season.whip||0).toFixed(2),
         K:season.ks,
@@ -23631,7 +23623,11 @@ function exportAnalyticsBundle(opts){
           const _r=_computeRecordsData().batters.find(b=>b.name===n);
           return _r?{h1B:_r.h1B,h2B:_r.h2B,h3B:_r.h3B,TB:_r.TB,
             wOBA:+_r.woba.toFixed(3),wRCplus:+_r.wrcPlus.toFixed(0),
-            wRAA:+_r.wraa.toFixed(1),oWAR:+_r.owar.toFixed(2)}:null;
+            wRAA:+_r.wraa.toFixed(1),oWAR:+_r.owar.toFixed(2),
+            WAR144:+_r.war144.toFixed(1),
+            dOAA_ref:_r.dOaa!=null?+_r.dOaa.toFixed(1):null,
+            dWAR_ref:_r.dWar!=null?+_r.dWar.toFixed(2):null,
+            WAR_ref:+_r.war.toFixed(2)}:null;
         }catch(_){return null}})(),
         // V9.7 신규 sabermetrics 통계
         wOBA:(() => {
