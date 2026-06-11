@@ -21196,24 +21196,33 @@ function renderRecordsPage(){
   const cols = isB ? batCols : pitCols;
   
   // 헤더 셀
+  // V10.1: 좌측 고정(#/선수/팀) — 가로 스크롤 시에도 누가 누군지 항상 보임
+  const STICKY = { rank:{left:0,w:30}, name:{left:30,w:118}, team:{left:148,w:86} };
   const thHtml = cols.map(c => {
     const active = st.sortKey === c.k;
-    const arrow = active ? (st.sortDir==='desc' ? ' ▼' : ' ▲') : '';
-    return `<th onclick="_recSort('${c.k}')" ${c.t?`title="${c.t}"`:''} style="cursor:pointer;white-space:nowrap;padding:7px 8px;background:${active?'#2a3550':'var(--card2)'};color:${active?'#ffc844':(c.hl||'var(--muted)')};font-size:10.5px;position:sticky;top:0;border-bottom:2px solid ${active?'#ffc844':'var(--border)'};user-select:none;${c.w?`min-width:${c.w}`:''}">${c.l}${arrow}</th>`;
+    const arrow = active ? (st.sortDir==='desc' ? ' \u25bc' : ' \u25b2') : '';
+    let stickyCss = 'z-index:3;';
+    if(c.k==='name') stickyCss = `left:${STICKY.name.left}px;z-index:6;min-width:${STICKY.name.w}px;max-width:${STICKY.name.w}px;`;
+    else if(c.k==='team') stickyCss = `left:${STICKY.team.left}px;z-index:6;min-width:${STICKY.team.w}px;max-width:${STICKY.team.w}px;box-shadow:2px 0 4px rgba(0,0,0,0.35);`;
+    return `<th onclick="_recSort('${c.k}')" ${c.t?`title="${c.t}"`:''} style="cursor:pointer;white-space:nowrap;padding:6px 6px;background:${active?'#2a3550':'var(--card2)'};color:${active?'#ffc844':(c.hl||'var(--muted)')};font-size:10.5px;position:sticky;top:0;${stickyCss}border-bottom:2px solid ${active?'#ffc844':'var(--border)'};user-select:none">${c.l}${arrow}</th>`;
   }).join('');
   
-  // 데이터 행
+  // 데이터 행 — sticky 셀은 불투명 배경 필수 (투명이면 스크롤 시 글자 겹침)
   const trHtml = rows.map((r, i) => {
+    const rowBg = i%2 ? '#181d2c' : '#141828';
     const cells = cols.map(c => {
       const v = r[c.k];
       const txt = (v==null) ? '-' : c.fmt(v);
-      const isName = c.k === 'name';
-      const click = isName ? `onclick="openCardDetail('${String(r.name).replace(/'/g,"\\'")}','${isB?'batter':'pitcher'}')" style="cursor:pointer;color:var(--text);font-weight:700;white-space:nowrap;padding:5px 8px"` 
-        : `style="font-family:var(--mono);color:${c.hl||'var(--text)'};text-align:right;padding:5px 8px;white-space:nowrap"`;
-      return `<td ${click}>${txt}</td>`;
+      if(c.k === 'name'){
+        return `<td onclick="openCardDetail('${String(r.name).replace(/'/g,"\\'")}','${isB?'batter':'pitcher'}')" title="${String(r.name).replace(/"/g,'&quot;')}" style="cursor:pointer;color:var(--text);font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:4px 6px;position:sticky;left:${STICKY.name.left}px;z-index:2;background:${rowBg};min-width:${STICKY.name.w}px;max-width:${STICKY.name.w}px">${txt}</td>`;
+      }
+      if(c.k === 'team'){
+        return `<td title="${String(txt).replace(/"/g,'&quot;')}" style="color:var(--muted);font-size:10.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:4px 6px;position:sticky;left:${STICKY.team.left}px;z-index:2;background:${rowBg};min-width:${STICKY.team.w}px;max-width:${STICKY.team.w}px;box-shadow:2px 0 4px rgba(0,0,0,0.35)">${txt}</td>`;
+      }
+      return `<td style="font-family:var(--mono);color:${c.hl||'var(--text)'};text-align:right;padding:4px 6px;white-space:nowrap">${txt}</td>`;
     }).join('');
-    return `<tr style="border-bottom:1px solid var(--border);background:${i%2?'rgba(255,255,255,0.015)':'transparent'}">
-      <td style="color:var(--muted);font-family:var(--mono);font-size:10px;padding:5px 6px;text-align:center">${i+1}</td>${cells}</tr>`;
+    return `<tr style="border-bottom:1px solid var(--border);background:${rowBg}">
+      <td style="color:var(--muted);font-family:var(--mono);font-size:10px;padding:4px 4px;text-align:center;position:sticky;left:0;z-index:2;background:${rowBg};min-width:${STICKY.rank.w}px">${i+1}</td>${cells}</tr>`;
   }).join('');
   
   out.innerHTML = `<div class="container">
@@ -21244,7 +21253,7 @@ function renderRecordsPage(){
     <div class="card section" style="padding:0;overflow:auto;max-height:75vh">
       <table style="border-collapse:collapse;width:100%;font-size:11.5px">
         <thead><tr>
-          <th style="padding:7px 6px;background:var(--card2);color:var(--muted);font-size:10px;position:sticky;top:0;border-bottom:2px solid var(--border)">#</th>
+          <th style="padding:6px 4px;background:var(--card2);color:var(--muted);font-size:10px;position:sticky;top:0;left:0;z-index:7;border-bottom:2px solid var(--border);min-width:30px">#</th>
           ${thHtml}
         </tr></thead>
         <tbody>${trHtml || '<tr><td colspan="25" style="padding:30px;text-align:center;color:var(--muted)">조건에 맞는 선수가 없습니다</td></tr>'}</tbody>
